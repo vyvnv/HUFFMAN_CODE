@@ -140,7 +140,7 @@ void HuffmanTree::TreeTour(Node * m_root, string code, unordered_map<char, strin
 
     if ((m_root -> m_left == nullptr) && (m_root -> m_right = nullptr)) {
 
-        codes[m_root -> m_char] = code;
+        codes[m_root -> m_char] = '0';
         return;
         }
 
@@ -165,9 +165,10 @@ void saveTable (ofstream& outputFile, unordered_map<char, string>& codes) // в 
     }
 
     outputFile << endl << " }" << endl;
+    cout << "Table is written correctly";
 }
 
-void bitOut (ofstream& outputFile, char b) { // записать 
+/*void bitOut (ofstream& outputFile, char b) { // записать 
 
 	current_byte <<= 1;
 
@@ -181,40 +182,90 @@ void bitOut (ofstream& outputFile, char b) { // записать
 		nbits = 0;
 		current_byte = 0;
 	}
+}*/
+
+void writeBitToFile(const string& filename, bool bit) {
+    ofstream file(filename, ios::binary | ios::app);
+
+    if (!file.is_open()) {
+        std::cerr << "Unable to open the file" << std::endl;
+        return;
+    }
+    // Буфер для хранения одного байта
+    char buffer = 0;
+
+    // Установка нужного бита в буфере
+    if (bit) {
+        buffer |= 1; // Устанавливаем младший бит в 1
+    } else {
+        buffer &= ~1; // Устанавливаем младший бит в 0
+    }
+
+    // Запись буфера в файл
+    file.write(&buffer, 1);
+
+    file.close();
 }
 
 bool Encode() {
-    HuffmanTree example;
 
-    unordered_map Text = example.FillTheMap("input.txt");
+    HuffmanTree object;
 
-    example.BuildHuffmanTree(Text);
+    unordered_map Text = object.FillTheMap("input.txt");
+
+    object.BuildHuffmanTree(Text);
 
     unordered_map<char, string> codes;
 
-    HuffmanTree::Node * root = example.getRoot();
+    HuffmanTree::Node * root = object.getRoot(); cout << "I'm here!";
 
     string code;
 
-    example.TreeTour(root, code, codes);
+    object.TreeTour(root, code, codes);
 
-	ifstream plainText("input.txt", ios_base::binary);
+	ifstream plainText("input.txt", ios_base::binary); // это текст из которого читаем и который нужно закодировать
+	if (!plainText.is_open()) {
+        cout << "Couldn't open the plaintext";
+        return 0;
+    }
+    cout << "I'm here";
     const char * encodedFileName = "encoded.bin";
-    ofstream readFile(encodedFileName, ios_base::binary);
-    saveTable(readFile, codes);
-    readFile.close();
+    ofstream readFile(encodedFileName, ios_base::binary); //а это файл в который кодируем
+	if (!readFile.is_open()) {
+        cout << "Couldn't create a file";
+        return 0;
+    }
+
+    saveTable(readFile, codes); // занесли коды символов в файл
+   // readFile.close();
 
     current_byte = 0;
 	nbits = 0;
 	nbytes = 0;
     
-	unsigned char characterfromFile;
+	char characterfromFile;
 	char * charIndex;
-	while()
+
+	while(!plainText.eof()) {
+		plainText.get(characterfromFile);
+		int len = codes[characterfromFile].length();
+		for (int i = 0;(codes[characterfromFile])[i] < len; i++) { // перебираем символы строки кода символа.
+			if ((codes[characterfromFile])[i] == '0') writeBitToFile(encodedFileName, false);
+			if ((codes[characterfromFile])[i] == '1') writeBitToFile(encodedFileName, true);
+			else {
+				cout << "Error: wrong sequence of bits";
+				return 1;
+			}
+		
+		//for (charIndex = codes[characterfromFile]; * charIndex; charIndex++) bitOut(readFile, *charIndex);
+		
+		}
+	}
+	//while (nbits) bitOut (readFile, '0');
+	readFile.close();
+	plainText.close();
+	return 1;
     
-
-
-
 }
 
 //bool Test(){
@@ -224,5 +275,6 @@ bool Encode() {
 int main(){
   //  if (Test()) cout << "Encoded and decoded back sucsessfully";
   //  else cout << "Something went wrong";
-  Encode();
+  if (!Encode()) cout << "Couldn't open the file";
+  return 0;
 }
