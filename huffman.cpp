@@ -4,40 +4,39 @@
 #include <map>
 #include <unordered_map>
 #include <fstream>
-#include <string>
+#include <cstring>
 #include <algorithm>
 
 using namespace std;
 
-class HuffmanTree
-{
-public:
-    class Node;                                                                                        
+class HuffmanTree {
+   public:
 
-    HuffmanTree();                                                                                   
+    class Node; 
 
-    ~HuffmanTree();                                                                             
+    HuffmanTree(); 
 
-    void BuildHuffmanTree(const string& text);                                              
+    ~HuffmanTree(); 
 
-    string EncodeSym(char symbol) const;                                                           
 
-    string Encode(const string& text) const;                              
-
-    string Decode(const string& text) const;                                                 
-
-private:
     Node* m_root = nullptr;
 
-    void DestructorHelp(Node* node);                                                              
+    void DestructorHelp(Node* node);
 
-    void CountFrequencies(Node* node, unordered_map<char, int>& frequencyMap) const;           
+    unordered_map<char, int> FillTheMap(string fileName);
 
-    void EncodeHelp(Node* node, char symbol, string currentCode, string& encodedSymbol) const;
+    void BuildHuffmanTree(unordered_map<char, int>frequencyMap);
+    
+
+    void TreeTour(Node * m_root, string code, unordered_map<char, string>& codes); // аргументики
+
+    Node * getRoot()const{
+        return m_root;
+        }
 };
 
-class HuffmanTree::Node
-{
+class HuffmanTree::Node {
+
 public:
     char m_char;
     int m_frequency;
@@ -46,9 +45,9 @@ public:
 
     Node(char huffmanChar, int frequency, Node* m_left = nullptr, Node* m_right = nullptr)
         : m_char(huffmanChar), m_frequency(frequency), m_left(m_left), m_right(m_right) {}
+    
 
 };
-
 
 HuffmanTree::HuffmanTree()
 {
@@ -70,11 +69,21 @@ void HuffmanTree::DestructorHelp(Node* node)
     }
 }
 
-void HuffmanTree::BuildHuffmanTree(const string& text)
-{
+ unordered_map<char, int> HuffmanTree::FillTheMap(string fileName){
+
     unordered_map<char, int> frequencyMap;
 
-    for (char huffmanChar : text)
+    ifstream inputFile(fileName);
+
+     if (!inputFile.is_open()) {
+        cerr << "Could not open the file." << endl;
+        frequencyMap['0'] = -1;
+        return frequencyMap;
+    }
+
+    char huffmanChar;
+
+    while(inputFile.get(huffmanChar))
     {
         if (frequencyMap.count(huffmanChar) == 0)
         {
@@ -85,147 +94,135 @@ void HuffmanTree::BuildHuffmanTree(const string& text)
             frequencyMap[huffmanChar]++;
         }
     }
+	inputFile.close();
+    return frequencyMap;
 
+ }
+
+void HuffmanTree::BuildHuffmanTree(unordered_map<char, int> frequencyMap)
+{
     list<Node*> nodeList;
 
     for (auto& element : frequencyMap)
     {
         nodeList.push_back(new Node(element.first, element.second));
-    }
+    } // занесли неотсортированные данные о частотах символов в список
 
-    while (nodeList.size() != 1)
+    while (nodeList.size() > 1)
     {
         nodeList.sort([](Node* left, Node* right)
             {
-                return left->m_frequency < right->m_frequency;
+                return left->m_frequency > right->m_frequency; // сортирую по убыванию частот
             });
 
-        Node* node1 = nodeList.front();
-        nodeList.pop_front();
-        Node* node2 = nodeList.front();
-        nodeList.pop_front();
+		if (!nodeList.empty()) { // проверяем список на пустоту
+            Node* node1 = nodeList.front(); // заносим в узел верхний  элемент из списка
+            nodeList.pop_front(); // вытаскиваем из списка верхний элемент
+            Node* node2 = nodeList.front();
+            nodeList.pop_front();
 
-        Node* newNode = new Node('\0', node1->m_frequency + node2->m_frequency, node1, node2);
-        nodeList.push_back(newNode);
-    }
-
-    m_root = nodeList.front();
-    nodeList.pop_front();
+            Node* newNode = new Node('\0', node1->m_frequency + node2->m_frequency, node1, node2);
+            nodeList.push_back(newNode);
+	    }
+	}
+        if (!nodeList.empty()){
+          	m_root = nodeList.front();
+		    nodeList.pop_front();// убираем вершину списка  
+            cout << "Tree is done!";
+        }
+        else cout << "File is empty, unable to build the tree";
 }
 
-string HuffmanTree::EncodeSym(char symbol) const
-{
-    string encodedSymbol = "";
-    EncodeHelp(m_root, symbol, "", encodedSymbol);
 
-    return encodedSymbol;
-}
 
-string HuffmanTree::Encode(const string& text) const
-{
-    string encodedText = "";
+void HuffmanTree::TreeTour(Node * m_root, string code, unordered_map<char, string>& codes){
 
-    for (char huffmanChar : text)
-    {
-        encodedText += EncodeSym(huffmanChar);
-    }
 
-    return encodedText;
-}
+    if ((m_root -> m_left == nullptr) && (m_root -> m_right = nullptr)) {
 
-void HuffmanTree::EncodeHelp(Node* node, char symbol, string currentCode, string& encodedSymbol) const
-{
-    if (!node)
-    {
+        codes[m_root -> m_char] = code;
         return;
+        }
+
+        else {
+
+        TreeTour(m_root->m_left, code + "0", codes);
+        TreeTour(m_root->m_right, code + "1", codes);
     }
 
-    if (node->m_char == symbol)
-    {
-        encodedSymbol = currentCode;
-
-        return;
-    }
-
-    EncodeHelp(node->m_left, symbol, currentCode + "0", encodedSymbol);
-    EncodeHelp(node->m_right, symbol, currentCode + "1", encodedSymbol);
 }
 
-string HuffmanTree::Decode(const string& text) const
+int nbits, current_byte, nbytes;
+
+void saveTable (ofstream& outputFile, unordered_map<char, string>& codes) // в откртый файл помещаем информацию о соответствии кодируемых символов и кодирующих цепочек
 {
-    string decodedText = "";
-    Node* currentNode = m_root;
+    outputFile << "{ ";
 
-    for (char huffmanChar : text)
-    {
-        if (huffmanChar == '0')
-        {
-            currentNode = currentNode->m_left;
-        }
-        else
-        {
-            currentNode = currentNode->m_right;
-        }
-
-        if (!currentNode->m_left && !currentNode->m_right)
-        {
-            decodedText += currentNode->m_char;
-            currentNode = m_root;
-        }
+    for(const auto& pair : codes){
+        char key = pair.first;
+        string value = pair.second;
+        outputFile << key << " : " << value;
     }
 
-    return decodedText;
+    outputFile << endl << " }" << endl;
 }
 
-void HuffmanTree::CountFrequencies(Node* node, unordered_map<char, int>& frequencyMap) const
-{
-    if (!node)
-    {
-        return;
-    }
+void bitOut (ofstream& outputFile, char b) { // записать 
 
-    if (!node->m_left && !node->m_right)
-    {
-        if (frequencyMap.count(node->m_char) == 0)
-        {
-            frequencyMap[node->m_char] = 1;
-        }
-        else
-        {
-            frequencyMap[node->m_char]++;
-        }
-    }
+	current_byte <<= 1;
 
-    CountFrequencies(node->m_left, frequencyMap);
-    CountFrequencies(node->m_right, frequencyMap);
+	if (b == '1') current_byte |= 1;
+
+	nbits++;
+
+	if (nbits == 8) {
+        outputFile << current_byte;
+		nbytes++;
+		nbits = 0;
+		current_byte = 0;
+	}
 }
 
-int main()
-{
-    setlocale(LC_ALL, "Russian");
+bool Encode() {
+    HuffmanTree example;
 
-    ifstream inputFile("input.txt");
-    string text((istreambuf_iterator<char>(inputFile)), istreambuf_iterator<char>());
+    unordered_map Text = example.FillTheMap("input.txt");
 
-    HuffmanTree labHuffmanTree;
-    labHuffmanTree.BuildHuffmanTree(text);
+    example.BuildHuffmanTree(Text);
 
-    auto result = labHuffmanTree.Encode(text);
-    string encodedText = result;
+    unordered_map<char, string> codes;
 
-    ofstream encodedFile("encoded.txt");
-    encodedFile << encodedText;
-    encodedFile.close();
+    HuffmanTree::Node * root = example.getRoot();
 
-    ifstream encodedInputFile("encoded.txt");
-    string encodedInputText((istreambuf_iterator<char>(encodedInputFile)), istreambuf_iterator<char>());
+    string code;
 
-    string decodedText = labHuffmanTree.Decode(encodedInputText);
-    ofstream decodedFile("decoded.txt");
-    decodedFile << decodedText;
-    decodedFile.close();
+    example.TreeTour(root, code, codes);
 
-    cout << ((text == decodedText) ? "decoded" : "not decoded") << endl;
+	ifstream plainText("input.txt", ios_base::binary);
+    const char * encodedFileName = "encoded.bin";
+    ofstream readFile(encodedFileName, ios_base::binary);
+    saveTable(readFile, codes);
+    readFile.close();
 
-    return 0;
+    current_byte = 0;
+	nbits = 0;
+	nbytes = 0;
+    
+	unsigned char characterfromFile;
+	char * charIndex;
+	while()
+    
+
+
+
+}
+
+//bool Test(){
+
+//}
+
+int main(){
+  //  if (Test()) cout << "Encoded and decoded back sucsessfully";
+  //  else cout << "Something went wrong";
+  Encode();
 }
